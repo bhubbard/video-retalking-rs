@@ -1,0 +1,20 @@
+[package]
+name = "videoretalking-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core engine for VideoReTalking: audio-driven lip synchronization, face alignment, and inpainting"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+colored.workspace = true
+safetensors.workspace = true
+hound.workspace = true
+image.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

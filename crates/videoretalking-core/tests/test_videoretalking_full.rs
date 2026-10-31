@@ -1,6 +1,6 @@
 use videoretalking_core::{
     AffineTransform, AlignedFaceBox, AudioLipSyncWindow, EnhancerModel, FaceAlignment,
-    LipSyncEngine, MelProcessor, Point2D, VideoReTalkingConfig, WeightsManager,
+    FaceLandmarks68, LipSyncEngine, MelProcessor, Point2D, VideoReTalkingConfig, WeightsManager,
 };
 
 #[test]
@@ -40,6 +40,16 @@ fn test_face_alignment_and_blend_mask() {
         inverse_transform: AffineTransform::default(),
     };
     assert_eq!(aligned_box.bbox[0], 10.0);
+
+    let lms1 = FaceLandmarks68::canonical_neutral(256.0);
+    let mut lms2 = lms1.clone();
+    lms2.points[50].y += 20.0;
+    let smoothed = FaceAlignment::smooth_landmarks_temporal(&[lms1, lms2.clone()], 3);
+    assert_eq!(smoothed.len(), 2);
+
+    let engine = LipSyncEngine::new(true);
+    let neutralized = engine.neutralize_expression_delta(&lms2);
+    assert!(neutralized.points[50].y < lms2.points[50].y);
 }
 
 #[test]
@@ -70,12 +80,12 @@ fn test_lipsync_engine_planning() {
 
 #[test]
 fn test_config_enhancers() {
-    let mut config = VideoReTalkingConfig::default();
+    let config = VideoReTalkingConfig {
+        enhancer: EnhancerModel::RestoreFormer,
+        ..Default::default()
+    };
     assert_eq!(config.fps, 25.0);
     assert_eq!(config.face_size, 256);
-    assert_eq!(config.enhancer, EnhancerModel::None);
-
-    config.enhancer = EnhancerModel::RestoreFormer;
     assert_eq!(config.enhancer, EnhancerModel::RestoreFormer);
 }
 

@@ -1,19 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EnhancerModel {
+    #[default]
     None,
     Gfpgan,
     RestoreFormer,
     CodeFormer,
-}
-
-impl Default for EnhancerModel {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Execution parameters for VideoReTalking

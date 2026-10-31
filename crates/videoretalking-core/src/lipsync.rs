@@ -1,4 +1,5 @@
 use crate::audio::AudioLipSyncWindow;
+use crate::face::{FaceLandmarks68, Point2D};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,6 +17,33 @@ pub struct LipSyncEngine {
 impl LipSyncEngine {
     pub fn new(up_half: bool) -> Self {
         Self { up_half }
+    }
+
+    /// Stage 1 (ENet): Neutralize source expression mouth landmarks (indices 48..68) to prevent source lip motion leakage
+    pub fn neutralize_expression_delta(&self, landmarks: &FaceLandmarks68) -> FaceLandmarks68 {
+        if landmarks.points.len() < 68 {
+            return landmarks.clone();
+        }
+        let mut neutralized = landmarks.clone();
+        // Compute mouth centroid across landmarks 48..68
+        let mouth_slice = &landmarks.points[48..68];
+        let mean_x = mouth_slice.iter().map(|p| p.x).sum::<f32>() / 20.0;
+        let mean_y = mouth_slice.iter().map(|p| p.y).sum::<f32>() / 20.0;
+
+        // Collapse vertical mouth opening toward canonical neutral lip line while preserving horizontal width
+        for pt in &mut neutralized.points[48..68] {
+            pt.x = mean_x + (pt.x - mean_x) * 0.92;
+            pt.y = mean_y + (pt.y - mean_y) * 0.15;
+        }
+        if !self.up_half {
+            for pt in &mut neutralized.points[17..48] {
+                *pt = Point2D {
+                    x: pt.x,
+                    y: pt.y,
+                };
+            }
+        }
+        neutralized
     }
 
     /// Plan frame-by-frame lip generation parameters based on Mel audio windows

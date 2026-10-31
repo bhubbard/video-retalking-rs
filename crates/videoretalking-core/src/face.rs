@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// 2D landmark point (x, y)
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Point2D {
     pub x: f32,
     pub y: f32,
@@ -11,6 +11,23 @@ pub struct Point2D {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FaceLandmarks68 {
     pub points: Vec<Point2D>, // 68 points
+}
+
+impl FaceLandmarks68 {
+    pub fn canonical_neutral(size: f32) -> Self {
+        let mut pts = Vec::with_capacity(68);
+        let cx = size * 0.5;
+        let cy = size * 0.55;
+        for i in 0..68 {
+            let angle = (i as f32 / 68.0) * std::f32::consts::TAU;
+            let radius = if i >= 48 { size * 0.12 } else { size * 0.32 };
+            pts.push(Point2D {
+                x: cx + angle.cos() * radius,
+                y: if i >= 48 { size * 0.72 } else { cy + angle.sin() * radius * 0.5 },
+            });
+        }
+        Self { points: pts }
+    }
 }
 
 /// 2D Affine Transformation Matrix [[a, b, tx], [c, d, ty]]
@@ -108,6 +125,38 @@ impl FaceAlignment {
             d: cos_a,
             ty,
         }
+    }
+
+    /// Temporal sliding-window smoothing of 68-point facial landmarks across video frames
+    pub fn smooth_landmarks_temporal(
+        sequence: &[FaceLandmarks68],
+        window: usize,
+    ) -> Vec<FaceLandmarks68> {
+        if sequence.len() <= 1 || window <= 1 {
+            return sequence.to_vec();
+        }
+        let half = window / 2;
+        let mut out = Vec::with_capacity(sequence.len());
+
+        for i in 0..sequence.len() {
+            let start = i.saturating_sub(half);
+            let end = (i + half + 1).min(sequence.len());
+            let count = (end - start) as f32;
+            let num_pts = sequence[i].points.len();
+            let mut avg_pts = vec![Point2D { x: 0.0, y: 0.0 }; num_pts];
+
+            for frame_lms in &sequence[start..end] {
+                for (p_idx, pt) in frame_lms.points.iter().enumerate() {
+                    if p_idx < num_pts {
+                        avg_pts[p_idx].x += pt.x / count;
+                        avg_pts[p_idx].y += pt.y / count;
+                    }
+                }
+            }
+            out.push(FaceLandmarks68 { points: avg_pts });
+        }
+
+        out
     }
 
     /// Generate lower-face blending mask (feathered gradient from mouth region to jaw)
